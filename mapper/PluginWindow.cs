@@ -36,14 +36,14 @@ public partial class PluginWindow : EditorPlugin
         InputImageMapperWindow = new Control();
         InputImageMapperWindow.CustomMinimumSize = new Vector2(0, 250);
         
-        VBoxContainer container = new VBoxContainer();
+        var container = new VBoxContainer();
         container.SetAnchorAndOffset(Side.Left, 0, 0);
         InputImageMapperWindow.AddChild(container);
         
-        HBoxContainer inputDirectoryRow = new HBoxContainer();
+        var inputDirectoryRow = new HBoxContainer();
         container.AddChild(inputDirectoryRow);
         
-        Label inputDirectoryLabel = new Label();
+        var inputDirectoryLabel = new Label();
         inputDirectoryLabel.Text = "Input Directory: ";
         inputDirectoryRow.AddChild(inputDirectoryLabel);
         
@@ -52,15 +52,15 @@ public partial class PluginWindow : EditorPlugin
         InputDirectoryPathLineEdit.CustomMinimumSize = new Vector2(500, 0);
         inputDirectoryRow.AddChild(InputDirectoryPathLineEdit);
         
-        Button browseInputDirectoriesButton = new Button();
+        var browseInputDirectoriesButton = new Button();
         browseInputDirectoriesButton.Text = "Browse";
         browseInputDirectoriesButton.Pressed += OnInputBrowsePressed;
         inputDirectoryRow.AddChild(browseInputDirectoriesButton);
         
-        HBoxContainer outputDirectoryRow = new HBoxContainer();
+        var outputDirectoryRow = new HBoxContainer();
         container.AddChild(outputDirectoryRow);
         
-        Label outputDirectoryLabel = new Label();
+        var outputDirectoryLabel = new Label();
         outputDirectoryLabel.Text = "Output Directory: ";
         outputDirectoryRow.AddChild(outputDirectoryLabel);
         
@@ -70,15 +70,15 @@ public partial class PluginWindow : EditorPlugin
         OutputDirectoryPathLineEdit.CustomMinimumSize = new Vector2(500, 0);
         outputDirectoryRow.AddChild(OutputDirectoryPathLineEdit);
         
-        Button browseOutputDirectoriesButton = new Button();
+        var browseOutputDirectoriesButton = new Button();
         browseOutputDirectoriesButton.Text = "Browse";
         browseOutputDirectoriesButton.Pressed += OnOutputBrowsePressed;
         outputDirectoryRow.AddChild(browseOutputDirectoriesButton);
         
-        HBoxContainer outputFilenameRow = new HBoxContainer();
+        var outputFilenameRow = new HBoxContainer();
         container.AddChild(outputFilenameRow);
         
-        Label outputFilenameLabel = new Label();
+        var outputFilenameLabel = new Label();
         outputFilenameLabel.Text = "Filename (excluding extensions): ";
         outputFilenameRow.AddChild(outputFilenameLabel);
         
@@ -88,10 +88,10 @@ public partial class PluginWindow : EditorPlugin
         OutputFileNameLineEdit.PlaceholderText = "e.g., control_input_prompts";
         outputFilenameRow.AddChild(OutputFileNameLineEdit);
         
-        HBoxContainer filePatternRow = new HBoxContainer();
+        var filePatternRow = new HBoxContainer();
         container.AddChild(filePatternRow);
         
-        Label filePatternLabel = new Label();
+        var filePatternLabel = new Label();
         filePatternLabel.Text = "File Pattern: ";
         filePatternRow.AddChild(filePatternLabel);
         
@@ -100,7 +100,7 @@ public partial class PluginWindow : EditorPlugin
         FilePatternLineEdit.PlaceholderText = "e.g., *_Key_Light.png";
         filePatternRow.AddChild(FilePatternLineEdit);
         
-        HBoxContainer controllerInfoRow = new HBoxContainer();
+        var controllerInfoRow = new HBoxContainer();
         container.AddChild(controllerInfoRow);
         
         InputTypeDropdown = new OptionButton();
@@ -112,15 +112,15 @@ public partial class PluginWindow : EditorPlugin
         InputTypeDropdown.AddItem("Generic Controller"); // GenericController
         controllerInfoRow.AddChild(InputTypeDropdown);
         
-        HBoxContainer actionsRow = new HBoxContainer();
+        var actionsRow = new HBoxContainer();
         container.AddChild(actionsRow);
         
-        Button mapButton = new Button();
+        var mapButton = new Button();
         mapButton.Text = "Map Images";
         mapButton.Pressed += OnMapPressed;
         actionsRow.AddChild(mapButton);
         
-        Button saveButton = new Button();
+        var saveButton = new Button();
         saveButton.Text = "Save Mapping";
         saveButton.Pressed += OnSavePressed;
         actionsRow.AddChild(saveButton);
@@ -134,7 +134,7 @@ public partial class PluginWindow : EditorPlugin
     {
         string inputDirectory = InputDirectoryPathLineEdit.Text;
         string filePattern = FilePatternLineEdit.Text;
-        InputType inputType = (InputType)InputTypeDropdown.Selected;
+        var inputType = (InputType)InputTypeDropdown.Selected;
         
         string result = InputImageMapper.MapResources(inputDirectory, filePattern, inputType);
         StatusLabel.Text = result;
@@ -154,7 +154,7 @@ public partial class PluginWindow : EditorPlugin
     private void OnOutputBrowsePressed() => BrowseFilesystem("Directory to save resource", OutputDirectoryPathLineEdit);
     private void BrowseFilesystem(string searchTitle, LineEdit linkedLineEdit)
     {
-        FileDialog fileDialog = new FileDialog();
+        var fileDialog = new FileDialog();
         fileDialog.FileMode = FileDialog.FileModeEnum.OpenDir;
         fileDialog.Access = FileDialog.AccessEnum.Resources;
         fileDialog.Title = searchTitle;

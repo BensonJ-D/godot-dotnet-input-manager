@@ -9,7 +9,7 @@ public class InputImageMapper
 {
     public InputImageMappingResource MappingResource { get; private set; }
 
-    private Dictionary<InputType, List<string>> SDLInputNames = new()
+    private Dictionary<InputType, List<string>> SDLInputButtonNames = new()
     {
         { InputType.XboxController, ["A", "B", "X", "Y", "View", "Guide", "Menu", "Left_Stick_Click", "Right_Stick_Click", "LB", "RB", "Dpad_Up", "Dpad_Down", "Dpad_Left", "Dpad_Right", "Share"] },
         { InputType.NintendoController, ["B", "A", "Y", "X", "Minus", "Home", "Plus", "Left Stick", "Right Stick", "LB", "RB", "Dpad_Up", "Dpad_Down", "Dpad_Left", "Dpad_Right", "Capture"] },
@@ -199,7 +199,7 @@ public class InputImageMapper
 
     private InputEvent GetControllerInputEventFromInputName(string inputName, InputType inputType)
     {
-        List<string> inputNames = SDLInputNames[inputType];
+        List<string> inputNames = SDLInputButtonNames[inputType];
         int inputIndex = inputNames.IndexOf(inputName);
         
         if (inputIndex < 0) return null;
