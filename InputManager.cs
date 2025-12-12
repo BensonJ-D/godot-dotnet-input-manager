@@ -1,42 +1,65 @@
 using System;
 using Godot;
 using Godot.Collections;
-using InputManager.InputImageMapping;
+using DotNetInputManager.InputImageMapping;
 
-namespace InputManager;
+namespace DotNetInputManager;
 
-[GlobalClass]
 public partial class InputManager : Node
 {
+    public static InputManager Instance { get; private set; }
+    
     [Export] public InputImageMappingResource KeyboardIconMapping { get; private set; }
     [Export] public InputImageMappingResource SonyIconMapping { get; private set; }
     [Export] public InputImageMappingResource NintendoIconMapping { get; private set; }
     [Export] public InputImageMappingResource XboxIconMapping { get; private set; }
     
-    [Export] public Dictionary<string, Array<string>> InputActionGroups { get; private set; } 
+    [Export] public InputActionGroups InputActionGroups { get; private set; } 
     
+    public InputType InputType { get; private set; }
     public string DeviceName { get; private set; }
     public string DeviceVendor { get; private set; } 
     public string DeviceId { get; private set; } 
-    public Action<int> DeviceChanged { get; set; }
-    
+    public Action<InputType> InputTypeChanged { get; set; }
+
+    public override void _Ready()
+    {
+        Instance = this;
+    }
+
     public override void _Input(InputEvent @event)
     {
-        if (@event is not InputEventJoypadButton) return;
-        
-        int deviceId = @event.Device;
-        Dictionary deviceInfo = Input.GetJoyInfo(deviceId);
+        if (@event is InputEventMouseMotion or InputEventMouseButton or InputEventKey 
+            && InputType != InputType.KeyboardAndMouse)
+        {
+            InputType = InputType.KeyboardAndMouse;
+            InputTypeChanged?.Invoke(InputType);
+        }
             
-        DeviceVendor = deviceInfo["vendor_id"].AsString();
-        DeviceId = deviceInfo["product_id"].AsString();
-        DeviceName = Input.GetJoyName(deviceId);
+        if (@event is InputEventJoypadButton or InputEventJoypadMotion)
+        {
+            int deviceId = @event.Device;
+            Dictionary deviceInfo = Input.GetJoyInfo(deviceId);
+
+            string deviceName = Input.GetJoyName(deviceId);
+            string deviceVendor = deviceInfo["vendor_id"].AsInt32().ToString("X4");
+            string productId = deviceInfo["product_id"].AsInt32().ToString("X4");
+
+            InputType inputType = GetControllerType(deviceVendor, productId);
             
-        DeviceChanged(deviceId);
+            if (inputType == InputType) return;
+            
+            DeviceVendor = deviceVendor;
+            DeviceId = productId;
+            DeviceName = deviceName;
+            InputType = inputType;
+            InputTypeChanged?.Invoke(InputType);
+        }
     }
 
     public void AddInputMapInputEvent(string inputAction, InputEvent inputEvent)
     {
-        Array<string> actionGroup = InputActionGroups[inputAction];
+        Array<string> actionGroup = InputActionGroups.GetActions(inputAction);
         foreach (string action in actionGroup)
         {
             InputMap.ActionAddEvent(action, inputEvent);
@@ -45,7 +68,7 @@ public partial class InputManager : Node
     
     public void RemoveInputMapInputEvent(string inputAction, InputEvent inputEvent)
     {
-        Array<string> actionGroup = InputActionGroups[inputAction];
+        Array<string> actionGroup = InputActionGroups.GetActions(inputAction);
         foreach (string action in actionGroup)
         {
             InputMap.ActionEraseEvent(action, inputEvent);
@@ -54,7 +77,7 @@ public partial class InputManager : Node
     
     public void RemoveInputMapInputEvents(string inputAction)
     {
-        Array<string> actionGroup = InputActionGroups[inputAction];
+        Array<string> actionGroup = InputActionGroups.GetActions(inputAction);
         foreach (string action in actionGroup)
         {
             InputMap.ActionEraseEvents(action);
@@ -63,25 +86,28 @@ public partial class InputManager : Node
 
     public string GetInputIcon(InputEvent inputEvent, InputType inputType)
     {
-        InputImageMappingResource mappingResource;
-        switch (inputType)
+        InputImageMappingResource mappingResource = inputType switch
         {
-            case InputType.KeyboardAndMouse:
-                mappingResource = KeyboardIconMapping;
-                break;
-            case InputType.XboxController:
-                mappingResource = XboxIconMapping;
-                break;
-            case InputType.NintendoController:
-                mappingResource = NintendoIconMapping;
-                break;
-            case InputType.SonyController:
-                mappingResource = SonyIconMapping;
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(inputType), inputType, null);
-        }
-        
+            InputType.KeyboardAndMouse => KeyboardIconMapping,
+            InputType.XboxController => XboxIconMapping,
+            InputType.NintendoController => NintendoIconMapping,
+            InputType.SonyController => SonyIconMapping,
+            _ => XboxIconMapping
+        };
+
         return mappingResource.GetImagePathForInput(inputEvent);
+    }
+
+    public InputType LastSeenControllerType => GetControllerType(DeviceVendor, DeviceId);
+    
+    private InputType GetControllerType(string vendorId, string deviceId)
+    {
+        return vendorId switch
+        {
+            "057E" when deviceId == "2009" => InputType.NintendoController,
+            "054C" when deviceId is "054C" or "0CE6" => InputType.SonyController,
+            "0738" when deviceId == "4507" => InputType.XboxController,
+            _ => InputType.GenericController
+        };
     }
 }

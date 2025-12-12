@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel;
 
-namespace InputManager;
+namespace DotNetInputManager;
 
 public enum InputType
 {

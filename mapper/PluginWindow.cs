@@ -1,6 +1,6 @@
 using Godot;
 
-namespace InputManager.InputImageMapping;
+namespace DotNetInputManager.InputImageMapping;
 
 [Tool]
 public partial class PluginWindow : EditorPlugin

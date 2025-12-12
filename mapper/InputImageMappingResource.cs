@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 
-namespace InputManager.InputImageMapping;
+namespace DotNetInputManager.InputImageMapping;
 
 [GlobalClass]
 public partial class InputImageMappingResource : Resource

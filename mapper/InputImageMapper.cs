@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
-namespace InputManager.InputImageMapping;
+namespace DotNetInputManager.InputImageMapping;
 
 public class InputImageMapper
 {
