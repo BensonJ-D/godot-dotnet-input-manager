@@ -87,8 +87,14 @@ public partial class InputManager : Node
 
     public string GetInputIcon(string inputAction)
     {
-        InputEvent inputEvent = InputMap.ActionGetEvents(inputAction).First();
-
+        bool isKeyboard = InputType == InputType.KeyboardAndMouse;
+        
+        InputEvent inputEvent = InputMap.ActionGetEvents(inputAction)
+            .FirstOrDefault(it => isKeyboard ? 
+                it is InputEventKey or InputEventMouseButton : 
+                it is InputEventJoypadButton or InputEventJoypadMotion
+            );
+        
         return inputEvent != null ? GetInputIcon(inputEvent, InputType) : null;
     }
     
