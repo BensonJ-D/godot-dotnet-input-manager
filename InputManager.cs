@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 using Godot.Collections;
 using DotNetInputManager.InputImageMapping;
@@ -84,6 +85,13 @@ public partial class InputManager : Node
         }
     }
 
+    public string GetInputIcon(string inputAction)
+    {
+        InputEvent inputEvent = InputMap.ActionGetEvents(inputAction).First();
+
+        return inputEvent != null ? GetInputIcon(inputEvent, InputType) : null;
+    }
+    
     public string GetInputIcon(InputEvent inputEvent, InputType inputType)
     {
         InputImageMappingResource mappingResource = inputType switch
