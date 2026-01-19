@@ -21,7 +21,8 @@ public partial class InputManager : Node
     public InputType InputType { get; private set; }
     public string DeviceName { get; private set; }
     public string DeviceVendor { get; private set; }
-    public string DeviceId { get; private set; }
+    public string ProductId { get; private set; }
+    public int DeviceId { get; private set; }
     public Action<InputType> InputTypeChanged { get; set; }
     public Action<InputEvent> InputPressed { get; set; }
 
@@ -46,10 +47,10 @@ public partial class InputManager : Node
 
         if (@event is InputEventJoypadButton or InputEventJoypadMotion)
         {
-            int deviceId = @event.Device;
-            var deviceInfo = Input.GetJoyInfo(deviceId);
+            DeviceId = @event.Device;
+            var deviceInfo = Input.GetJoyInfo(DeviceId);
 
-            string deviceName = Input.GetJoyName(deviceId);
+            string deviceName = Input.GetJoyName(DeviceId);
             string deviceVendor = deviceInfo["vendor_id"].AsInt32().ToString("X4");
             string productId = deviceInfo["product_id"].AsInt32().ToString("X4");
 
@@ -58,7 +59,7 @@ public partial class InputManager : Node
             if (inputType == InputType) return;
 
             DeviceVendor = deviceVendor;
-            DeviceId = productId;
+            ProductId = productId;
             DeviceName = deviceName;
             InputType = inputType;
             InputTypeChanged?.Invoke(InputType);
@@ -121,7 +122,7 @@ public partial class InputManager : Node
 
     public InputType LastSeenControllerType
     {
-        get => GetControllerType(DeviceVendor, DeviceId);
+        get => GetControllerType(DeviceVendor, ProductId);
     }
 
     private InputType GetControllerType(string vendorId, string deviceId)
@@ -133,5 +134,21 @@ public partial class InputManager : Node
             "0738" when deviceId == "4507" => InputType.XboxController,
             _ => InputType.GenericController,
         };
+    }
+
+    public void StartRumble()
+    {
+        if (InputType != InputType.KeyboardAndMouse)
+        {
+            Input.StartJoyVibration(DeviceId, 0.3f, 0.3f);
+        }
+    }
+
+    public void StopRumble()
+    {
+        if (InputType != InputType.KeyboardAndMouse)
+        {
+            Input.StopJoyVibration(DeviceId);
+        }
     }
 }
