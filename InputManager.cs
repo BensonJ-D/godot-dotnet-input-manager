@@ -151,4 +151,6 @@ public partial class InputManager : Node
             Input.StopJoyVibration(DeviceId);
         }
     }
+    
+    public bool IsKeyboardMouseInput => InputType == InputType.KeyboardAndMouse;
 }
