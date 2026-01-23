@@ -1,3 +1,4 @@
+#if TOOLS
 using Godot;
 
 namespace DotNetInputManager.InputImageMapping;
@@ -172,3 +173,4 @@ public partial class PluginWindow : EditorPlugin
         fileDialog.PopupCentered(new Vector2I(1600, 1000));
     }
 }
+#endif
