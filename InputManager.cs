@@ -153,4 +153,5 @@ public partial class InputManager : Node
     }
     
     public bool IsKeyboardMouseInput => InputType == InputType.KeyboardAndMouse;
+    public bool IsControllerInput => InputType == LastSeenControllerType;
 }
