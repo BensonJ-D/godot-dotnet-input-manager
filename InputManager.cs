@@ -17,6 +17,7 @@ public partial class InputManager : Node
     [Export] public InputImageMappingResource XboxIconMapping { get; private set; }
 
     [Export] public InputActionGroups InputActionGroups { get; private set; }
+    [Export] public float RumbleIntensity { get; private set; } = 1f;
 
     public InputType InputType { get; private set; }
     public string DeviceName { get; private set; }
@@ -136,11 +137,17 @@ public partial class InputManager : Node
         };
     }
 
-    public void StartRumble()
+    
+    public void SetRumbleIntensity(float intensity)
+    {
+        RumbleIntensity = Mathf.Clamp(intensity, 0f, 1f);
+    }
+    
+    public void StartRumble(float weakMotorIntensity, float strongMotorIntensity)
     {
         if (InputType != InputType.KeyboardAndMouse)
         {
-            Input.StartJoyVibration(DeviceId, 0.3f, 0.3f);
+            Input.StartJoyVibration(DeviceId, weakMotorIntensity * RumbleIntensity, strongMotorIntensity * RumbleIntensity);
         }
     }
 
