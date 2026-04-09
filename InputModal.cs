@@ -2,7 +2,7 @@ using Godot;
 using GodotTask;
 using Serilog;
 
-namespace ProjectKale.UI;
+namespace DotNetInputManager;
 
 public partial class InputModal : Popup
 {

@@ -1,8 +1,6 @@
 using System;
 using System.Linq;
-using System.Threading.Tasks;
 using Godot;
-using Godot.Collections;
 using DotNetInputManager.InputImageMapping;
 
 namespace DotNetInputManager;
