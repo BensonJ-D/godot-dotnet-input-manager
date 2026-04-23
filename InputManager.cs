@@ -140,11 +140,21 @@ public partial class InputManager : Node
     {
         RumbleIntensity = Mathf.Clamp(intensity, 0f, 1f);
     }
+
+    public void StartRumble(float weakMotorIntensity, float strongMotorIntensity, float duration)
+    {
+        if (InputType != InputType.KeyboardAndMouse)
+        {
+            StopRumble();
+            Input.StartJoyVibration(DeviceId, weakMotorIntensity * RumbleIntensity, strongMotorIntensity * RumbleIntensity, duration);
+        }
+    }
     
     public void StartRumble(float weakMotorIntensity, float strongMotorIntensity)
     {
         if (InputType != InputType.KeyboardAndMouse)
         {
+            StopRumble();
             Input.StartJoyVibration(DeviceId, weakMotorIntensity * RumbleIntensity, strongMotorIntensity * RumbleIntensity);
         }
     }
