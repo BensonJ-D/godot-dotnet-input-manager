@@ -32,9 +32,14 @@ public partial class AwaitInputModal : PanelContainer
         if (!@event.IsPressed() || @event.IsEcho())
             return;
         
-        if(@event is InputEventJoypadMotion { Axis: JoyAxis.TriggerLeft or JoyAxis.TriggerRight, AxisValue: < 1.0f })
+        switch(@event)
         {
-            return;
+            // Only register full press on triggers
+            case InputEventJoypadMotion { Axis: JoyAxis.TriggerLeft or JoyAxis.TriggerRight, AxisValue: < 1.0f }:
+                
+            // Only register sticks that favour a direction
+            case InputEventJoypadMotion { AxisValue: > -0.75f and < 0.75f}:
+                return;
         }
         
         switch(_inputType)
@@ -47,6 +52,11 @@ public partial class AwaitInputModal : PanelContainer
         
         RecordedAction = @event;
         Log.Debug( "Event recorded from Input Modal: {Event}", @event);
+        if(@event is InputEventJoypadMotion joypadMotion)
+        {
+            Log.Debug( "Axis recorded: {Axis}", joypadMotion.Axis.ToString());
+            Log.Debug( "AxisValue recorded: {AxisValue}", joypadMotion.AxisValue);
+        }
         
         Hide();
         EmitSignal(SignalName.ModalHide);

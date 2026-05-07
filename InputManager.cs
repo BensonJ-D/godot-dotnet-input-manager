@@ -234,7 +234,8 @@ public partial class InputManager : Node
                 inputButton.ButtonIndex == targetButton.ButtonIndex,
             
             InputEventJoypadMotion inputAxis when targetEvent is InputEventJoypadMotion targetAxis =>
-                Math.Sign(inputAxis.AxisValue) == Math.Sign(targetAxis.AxisValue),
+                Math.Sign(inputAxis.AxisValue) == Math.Sign(targetAxis.AxisValue) &&
+                inputAxis.Axis == targetAxis.Axis,
             
             _ => false
         };
