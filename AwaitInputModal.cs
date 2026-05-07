@@ -13,11 +13,13 @@ public partial class AwaitInputModal : PanelContainer
     
     [Export] private Label Title { get; set; }
     [Export] private Label Prompt { get; set; }
+    private GenericInputType _inputType;
 
-    public void OpenModal(string title, string prompt)
+    public void OpenModal(string title, string prompt, GenericInputType inputType)
     {
         Title.Text = title;
         Prompt.Text = prompt;
+        _inputType = inputType;
         
         Show();
         RecordedAction = null;
@@ -29,7 +31,20 @@ public partial class AwaitInputModal : PanelContainer
 
         if (!@event.IsPressed() || @event.IsEcho())
             return;
-
+        
+        if(@event is InputEventJoypadMotion { Axis: JoyAxis.TriggerLeft or JoyAxis.TriggerRight, AxisValue: < 1.0f })
+        {
+            return;
+        }
+        
+        switch(_inputType)
+        {
+            case GenericInputType.Keyboard when @event is not InputEventKey:
+            case GenericInputType.Controller when @event is not InputEventJoypadButton and not InputEventJoypadMotion:
+            case GenericInputType.Mouse when @event is not InputEventMouseButton:
+                return;
+        }
+        
         RecordedAction = @event;
         Log.Debug( "Event recorded from Input Modal: {Event}", @event);
         

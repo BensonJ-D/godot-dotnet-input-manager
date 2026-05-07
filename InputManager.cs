@@ -82,18 +82,24 @@ public partial class InputManager : Node
         
         if(InputMatchesEvent(targetEvent, existingEvent)) return;
         
+        if(targetEvent is InputEventJoypadMotion joypadMotion)
+        {
+            if(joypadMotion.AxisValue < 0) joypadMotion.AxisValue = -1.0f;
+            if(joypadMotion.AxisValue > 0) joypadMotion.AxisValue = 1.0f;
+        }
+        
         InputActionGroup owningGroup = InputActionGroups.ActionGroups.FirstOrDefault(group =>
             group.Actions
                 .SelectMany(action => InputMap.ActionGetEvents(action))
                 .Any(iEvent => InputMatchesEvent(targetEvent, iEvent))
         );
         
-        RemoveInputMapInputEvents(newOwnerActionGroup.GroupName);
+        RemoveInputMapInputEvent(newOwnerActionGroup.GroupName, existingEvent);
         AddInputMapInputEvent(newOwnerActionGroup.GroupName, targetEvent);
         
         if(owningGroup == null) return;
         
-        RemoveInputMapInputEvents(owningGroup.GroupName);
+        RemoveInputMapInputEvent(owningGroup.GroupName, targetEvent);
         AddInputMapInputEvent(owningGroup.GroupName, existingEvent);
     }
 
@@ -103,6 +109,12 @@ public partial class InputManager : Node
         foreach (string action in actionGroup.Actions)
         {
             InputMap.ActionAddEvent(action, inputEvent);
+            
+            // Treat triggers like buttons
+            if(inputEvent is InputEventJoypadMotion { Axis: JoyAxis.TriggerLeft or JoyAxis.TriggerRight })
+            {
+                InputMap.ActionSetDeadzone(action, 1.0f);
+            }
         }
         
         InputActionGroupUpdated?.Invoke(actionGroup);
@@ -179,28 +191,28 @@ public partial class InputManager : Node
 
     public void StartRumble(float weakMotorIntensity, float strongMotorIntensity, float duration)
     {
-        if (InputType != InputType.KeyboardAndMouse)
-        {
-            StopRumble();
-            Input.StartJoyVibration(DeviceId, weakMotorIntensity * RumbleIntensity, strongMotorIntensity * RumbleIntensity, duration);
-        }
+        if(InputType == InputType.KeyboardAndMouse)
+            return;
+        
+        StopRumble();
+        Input.StartJoyVibration(DeviceId, weakMotorIntensity * RumbleIntensity, strongMotorIntensity * RumbleIntensity, duration);
     }
     
     public void StartRumble(float weakMotorIntensity, float strongMotorIntensity)
     {
-        if (InputType != InputType.KeyboardAndMouse)
-        {
-            StopRumble();
-            Input.StartJoyVibration(DeviceId, weakMotorIntensity * RumbleIntensity, strongMotorIntensity * RumbleIntensity);
-        }
+        if(InputType == InputType.KeyboardAndMouse)
+            return;
+        
+        StopRumble();
+        Input.StartJoyVibration(DeviceId, weakMotorIntensity * RumbleIntensity, strongMotorIntensity * RumbleIntensity);
     }
 
     public void StopRumble()
     {
-        if (InputType != InputType.KeyboardAndMouse)
-        {
-            Input.StopJoyVibration(DeviceId);
-        }
+        if(InputType == InputType.KeyboardAndMouse)
+            return;
+        
+        Input.StopJoyVibration(DeviceId);
     }
     
     public bool IsKeyboardMouseInput => InputType == InputType.KeyboardAndMouse;
@@ -217,6 +229,12 @@ public partial class InputManager : Node
             
             InputEventJoypadButton inputButton when targetEvent is InputEventJoypadButton targetButton =>
                 inputButton.ButtonIndex == targetButton.ButtonIndex,
+            
+            InputEventMouseButton inputButton when targetEvent is InputEventMouseButton targetButton =>
+                inputButton.ButtonIndex == targetButton.ButtonIndex,
+            
+            InputEventJoypadMotion inputAxis when targetEvent is InputEventJoypadMotion targetAxis =>
+                Math.Sign(inputAxis.AxisValue) == Math.Sign(targetAxis.AxisValue),
             
             _ => false
         };

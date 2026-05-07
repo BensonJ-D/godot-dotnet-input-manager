@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Godot;
 
@@ -69,6 +70,13 @@ public partial class InputImageMappingResource : Resource
             
             InputEventJoypadButton inputButton when mapped is InputEventJoypadButton mappedButton => 
                 inputButton.ButtonIndex == mappedButton.ButtonIndex,
+            
+            InputEventMouseButton inputButton when mapped is InputEventMouseButton mappedButton =>
+                inputButton.ButtonIndex == mappedButton.ButtonIndex,
+            
+            InputEventJoypadMotion inputAxis when mapped is InputEventJoypadMotion mappedAxis =>
+                Math.Sign(inputAxis.AxisValue) == Math.Sign(mappedAxis.AxisValue) &&
+                inputAxis.Axis == mappedAxis.Axis,
             
             _ => false
         };
