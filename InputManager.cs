@@ -24,6 +24,7 @@ public partial class InputManager : Node
     public int DeviceId { get; private set; }
     public Action<InputType> InputTypeChanged { get; set; }
     public Action<InputEvent> InputPressed { get; set; }
+    public Action<InputActionGroup> InputActionGroupUpdated { get; set; }
 
     public override void _Ready()
     {
@@ -64,32 +65,67 @@ public partial class InputManager : Node
             InputTypeChanged?.Invoke(InputType);
         }
     }
+    
+    public void SwapInputMapInputEvent(string targetAction, InputEvent targetEvent, GenericInputType inputType)
+    {
+        InputActionGroup newOwnerActionGroup = InputActionGroups.GetGroup(targetAction);
+        
+        InputEvent existingEvent = newOwnerActionGroup.Actions
+            .SelectMany(action => InputMap.ActionGetEvents(action))
+            .FirstOrDefault(it => inputType switch
+            {
+                GenericInputType.Controller => it is InputEventJoypadButton or InputEventJoypadMotion,
+                GenericInputType.Keyboard => it is InputEventKey,
+                GenericInputType.Mouse => it is InputEventMouseButton,
+                _ => false,
+            });
+        
+        if(InputMatchesEvent(targetEvent, existingEvent)) return;
+        
+        InputActionGroup owningGroup = InputActionGroups.ActionGroups.FirstOrDefault(group =>
+            group.Actions
+                .SelectMany(action => InputMap.ActionGetEvents(action))
+                .Any(iEvent => InputMatchesEvent(targetEvent, iEvent))
+        );
+        
+        RemoveInputMapInputEvents(newOwnerActionGroup.GroupName);
+        AddInputMapInputEvent(newOwnerActionGroup.GroupName, targetEvent);
+        
+        if(owningGroup == null) return;
+        
+        RemoveInputMapInputEvents(owningGroup.GroupName);
+        AddInputMapInputEvent(owningGroup.GroupName, existingEvent);
+    }
 
     public void AddInputMapInputEvent(string inputAction, InputEvent inputEvent)
     {
-        var actionGroup = InputActionGroups.GetActions(inputAction);
-        foreach (string action in actionGroup)
+        var actionGroup = InputActionGroups.GetGroup(inputAction);
+        foreach (string action in actionGroup.Actions)
         {
             InputMap.ActionAddEvent(action, inputEvent);
         }
+        
+        InputActionGroupUpdated?.Invoke(actionGroup);
     }
 
     public void RemoveInputMapInputEvent(string inputAction, InputEvent inputEvent)
     {
-        var actionGroup = InputActionGroups.GetActions(inputAction);
-        foreach (string action in actionGroup)
+        var actionGroup = InputActionGroups.GetGroup(inputAction);
+        foreach (string action in actionGroup.Actions)
         {
             InputMap.ActionEraseEvent(action, inputEvent);
         }
+        InputActionGroupUpdated?.Invoke(actionGroup);
     }
 
     public void RemoveInputMapInputEvents(string groupName)
     {
-        var actionGroup = InputActionGroups.GetActions(groupName);
-        foreach (string action in actionGroup)
+        var actionGroup = InputActionGroups.GetGroup(groupName);
+        foreach (string action in actionGroup.Actions)
         {
             InputMap.ActionEraseEvents(action);
         }
+        InputActionGroupUpdated?.Invoke(actionGroup);
     }
 
     public string GetInputIcon(string inputAction)
@@ -129,7 +165,7 @@ public partial class InputManager : Node
         return vendorId switch
         {
             "057E" when deviceId == "2009" => InputType.NintendoController,
-            "054C" when deviceId is "054C" or "0CE6" => InputType.SonyController,
+            "054C" when deviceId is "054C" or "0CE6" or "09CC" => InputType.SonyController,
             "0738" when deviceId == "4507" => InputType.XboxController,
             _ => InputType.GenericController,
         };
@@ -169,4 +205,20 @@ public partial class InputManager : Node
     
     public bool IsKeyboardMouseInput => InputType == InputType.KeyboardAndMouse;
     public bool IsControllerInput => InputType == LastSeenControllerType;
+    
+    public static bool IsControllerConnected() => Input.GetConnectedJoypads().Count > 0;
+    
+    private static bool InputMatchesEvent(InputEvent inputEvent, InputEvent targetEvent)
+    {
+        return inputEvent switch
+        {
+            InputEventKey inputKey when targetEvent is InputEventKey targetKey =>
+                inputKey.PhysicalKeycode == targetKey.PhysicalKeycode,
+            
+            InputEventJoypadButton inputButton when targetEvent is InputEventJoypadButton targetButton =>
+                inputButton.ButtonIndex == targetButton.ButtonIndex,
+            
+            _ => false
+        };
+    }
 }

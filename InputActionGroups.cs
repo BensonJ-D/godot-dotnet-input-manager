@@ -9,5 +9,6 @@ public partial class InputActionGroups : Resource
 {
         [Export] public Array<InputActionGroup> ActionGroups { get; private set; }
         
+        public InputActionGroup GetGroup(string input) => ActionGroups.First(it => it.GroupName == input);
         public Array<string> GetActions(string input) => ActionGroups.First(it => it.GroupName == input).Actions;
 }

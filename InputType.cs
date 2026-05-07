@@ -8,3 +8,10 @@ public enum InputType
     SonyController,
     GenericController
 }
+
+public enum GenericInputType
+{
+    Controller,
+    Keyboard,
+    Mouse,
+}
