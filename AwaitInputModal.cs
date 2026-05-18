@@ -1,6 +1,5 @@
 using Godot;
 using GodotTask;
-using Serilog;
 
 namespace DotNetInputManager;
 
@@ -51,11 +50,11 @@ public partial class AwaitInputModal : PanelContainer
         }
         
         RecordedAction = @event;
-        Log.Debug( "Event recorded from Input Modal: {Event}", @event);
+        GD.Print( "Event recorded from Input Modal: {Event}", @event);
         if(@event is InputEventJoypadMotion joypadMotion)
         {
-            Log.Debug( "Axis recorded: {Axis}", joypadMotion.Axis.ToString());
-            Log.Debug( "AxisValue recorded: {AxisValue}", joypadMotion.AxisValue);
+            GD.Print( "Axis recorded: {Axis}", joypadMotion.Axis.ToString());
+            GD.Print( "AxisValue recorded: {AxisValue}", joypadMotion.AxisValue);
         }
         
         Hide();
