@@ -28,6 +28,8 @@ public partial class InputManager : Node
     public Action<InputEvent> InputPressed { get; set; }
     public Action<InputActionGroup> InputActionGroupUpdated { get; set; }
 
+    public enum InputSwapResponse { Success, NoChange, NoReplacement }
+    
     public override void _Ready()
     {
         Instance = this;
@@ -68,36 +70,36 @@ public partial class InputManager : Node
         }
     }
     
-    public void SwapKeyboardAndMouseEvents(InputActionGroup groupToUpdate, InputEvent newEvent, bool isPrimaryInput = false)
+    public InputSwapResponse SwapKeyboardAndMouseEvents(InputActionGroup groupToUpdate, InputEvent newEvent, bool isPrimaryInput = false)
     {
         GenericInputType inputType = GenericInputType.KeyboardAndMouse;
         
         // Get events in this group
-        Array<InputEvent> existingEventsInCurrentGroup = new Array<InputEvent>(groupToUpdate.Actions
-            .SelectMany(action => InputMap.ActionGetEvents(action))
-            .Where(iEvent => iEvent is InputEventKey or InputEventMouseButton));
+        Array<InputEvent> eventsInPrimaryAction = new Array<InputEvent>(
+            InputMap.ActionGetEvents(groupToUpdate.PrimaryAction)
+                .Where(@event => @event is InputEventKey or InputEventMouseButton)
+        );
         
-        existingEventsInCurrentGroup.Resize(2);
+        while(eventsInPrimaryAction.Count < 2)
+        {
+            eventsInPrimaryAction.Add(null);
+        }
         
         // Grab primary or secondary event, based on which one we clicked on
-        InputEvent existingEvent = isPrimaryInput ? existingEventsInCurrentGroup[0] : existingEventsInCurrentGroup[1];
+        InputEvent existingEvent = isPrimaryInput ? eventsInPrimaryAction[0] : eventsInPrimaryAction[1];
         
         // If event is the same, early exit
-        if(InputMatchesEvent(newEvent, existingEvent)) return;
+        if(InputMatchesEvent(newEvent, existingEvent)) return InputSwapResponse.NoChange;
        
         // If the swapped event is in our current group, remove both and add them back in the right order
-        InputEvent otherEvent = isPrimaryInput ? existingEventsInCurrentGroup[1] : existingEventsInCurrentGroup[0];
+        InputEvent otherEvent = isPrimaryInput ? eventsInPrimaryAction[1] : eventsInPrimaryAction[0];
         if(InputMatchesEvent(newEvent, otherEvent)) {        
             RemoveInputMapInputEvent(groupToUpdate.GroupName, newEvent, inputType);
             RemoveInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType);
             AddInputMapInputEvent(groupToUpdate.GroupName, newEvent, inputType, isPrimaryInput);
             AddInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType, !isPrimaryInput);
-            return;
+            return InputSwapResponse.Success;
         }
-        
-        // Otherwise replace the event in our current group with the new action
-        RemoveInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType);
-        AddInputMapInputEvent(groupToUpdate.GroupName, newEvent, inputType, isPrimaryInput);
         
         // Find group with existing event
         InputActionGroup owningGroup = InputActionGroups.GetGroups(inputType).Where(group => group != groupToUpdate).FirstOrDefault(group =>
@@ -106,20 +108,37 @@ public partial class InputManager : Node
                 .Any(iEvent => InputMatchesEvent(newEvent, iEvent))
         );
         
-        if(owningGroup == null) return;
+        if(owningGroup == null)
+        {
+            // Replace the event in our current group with the new action
+            RemoveInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType);
+            AddInputMapInputEvent(groupToUpdate.GroupName, newEvent, inputType, isPrimaryInput);
+            return InputSwapResponse.Success;
+        };
         
-        // Since we know our target event is in this group, just check the first element
-        InputEvent firstEventInOwningGroup = owningGroup.Actions
-            .SelectMany(action => InputMap.ActionGetEvents(action))
-            .FirstOrDefault(iEvent => iEvent is InputEventKey or InputEventMouseButton);
+        // Grab the primary actions
+        Array<InputEvent> eventsInOwningPrimaryAction = new Array<InputEvent>(
+            InputMap.ActionGetEvents(owningGroup.PrimaryAction)
+                .Where(@event => @event is InputEventKey or InputEventMouseButton)
+            );
         
-        bool isSwappedEventPrimaryInput = InputMatchesEvent(firstEventInOwningGroup, newEvent);
+        bool isSwappedEventPrimaryInput = InputMatchesEvent(eventsInOwningPrimaryAction.FirstOrDefault(), newEvent);
+        bool owningGroupHasMultipleEvents = eventsInOwningPrimaryAction.Count > 1;
+        
+        // If our source event is empty, and we're swapping with the only event for an action, no-op
+        if(isSwappedEventPrimaryInput && !owningGroupHasMultipleEvents && existingEvent == null) return InputSwapResponse.NoReplacement;
+        
+        // Otherwise replace the events
+        RemoveInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType);
+        AddInputMapInputEvent(groupToUpdate.GroupName, newEvent, inputType, isPrimaryInput);
         
         RemoveInputMapInputEvent(owningGroup.GroupName, newEvent, inputType);
         AddInputMapInputEvent(owningGroup.GroupName, existingEvent, inputType, isSwappedEventPrimaryInput);
+        
+        return InputSwapResponse.Success;
     }
     
-    public void SwapControllerEvents(InputActionGroup groupToUpdate, InputEvent targetEvent)
+    public InputSwapResponse SwapControllerEvents(InputActionGroup groupToUpdate, InputEvent targetEvent)
     {
         GenericInputType inputType = GenericInputType.Controller;
         
@@ -127,7 +146,7 @@ public partial class InputManager : Node
             .SelectMany(action => InputMap.ActionGetEvents(action))
             .FirstOrDefault(it => it is InputEventJoypadButton or InputEventJoypadMotion);
         
-        if(InputMatchesEvent(targetEvent, existingEvent)) return;
+        if(InputMatchesEvent(targetEvent, existingEvent)) return InputSwapResponse.NoChange;
         
         if(targetEvent is InputEventJoypadMotion joypadMotion)
         {
@@ -144,14 +163,19 @@ public partial class InputManager : Node
         RemoveInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType);
         AddInputMapInputEvent(groupToUpdate.GroupName, targetEvent, inputType);
         
-        if(owningGroup == null) return;
+        if(owningGroup != null)
+        {
+            RemoveInputMapInputEvent(owningGroup.GroupName, targetEvent, inputType);
+            AddInputMapInputEvent(owningGroup.GroupName, existingEvent, inputType);
+        }
         
-        RemoveInputMapInputEvent(owningGroup.GroupName, targetEvent, inputType);
-        AddInputMapInputEvent(owningGroup.GroupName, existingEvent, inputType);
+        return InputSwapResponse.Success;
     }
 
     public void AddInputMapInputEvent(string inputAction, InputEvent inputEvent, GenericInputType inputType, bool isPrimaryInput = false)
     {
+        if(inputEvent == null) return;
+        
         var actionGroup = InputActionGroups.GetGroup(inputType, inputAction);
         foreach (string action in actionGroup.Actions)
         {
