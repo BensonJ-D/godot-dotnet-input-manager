@@ -41,9 +41,15 @@ public partial class InputManager : Node
         {
             InputPressed?.Invoke(@event);
         }
-
-        if (@event is InputEventMouseMotion or InputEventMouseButton or InputEventKey
-            && InputType != InputType.KeyboardAndMouse)
+        
+        bool isKeyboardOrMouseEvent = @event switch
+        {
+            InputEventMouseMotion motion => motion.Relative != Vector2.Zero,
+            InputEventMouseButton or InputEventKey => true,
+            _ => false,
+        };
+        
+        if (isKeyboardOrMouseEvent && InputType != InputType.KeyboardAndMouse)
         {
             InputType = InputType.KeyboardAndMouse;
             InputTypeChanged?.Invoke(InputType);
@@ -51,6 +57,12 @@ public partial class InputManager : Node
 
         if (@event is InputEventJoypadButton or InputEventJoypadMotion)
         {
+            // Ignore small amounts of stick drift that don't register for movement
+            if (@event is InputEventJoypadMotion { AxisValue: > -0.25f and < 0.25f })
+            {
+                return;
+            }
+            
             DeviceId = @event.Device;
             var deviceInfo = Input.GetJoyInfo(DeviceId);
 
