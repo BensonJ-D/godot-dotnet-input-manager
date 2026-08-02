@@ -2,6 +2,8 @@ using System;
 using System.Linq;
 using Godot;
 using DotNetInputManager.InputImageMapping;
+using Godot.Collections;
+using Array = Godot.Collections.Array;
 
 namespace DotNetInputManager;
 
@@ -26,6 +28,8 @@ public partial class InputManager : Node
     public Action<InputEvent> InputPressed { get; set; }
     public Action<InputActionGroup> InputActionGroupUpdated { get; set; }
 
+    public enum InputSwapResponse { Success, NoChange, NoReplacement }
+    
     public override void _Ready()
     {
         Instance = this;
@@ -66,21 +70,83 @@ public partial class InputManager : Node
         }
     }
     
-    public void SwapInputMapInputEvent(string targetAction, InputEvent targetEvent, GenericInputType inputType)
+    public InputSwapResponse SwapKeyboardAndMouseEvents(InputActionGroup groupToUpdate, InputEvent newEvent, bool isPrimaryInput = false)
     {
-        InputActionGroup newOwnerActionGroup = InputActionGroups.GetGroup(targetAction);
+        GenericInputType inputType = GenericInputType.KeyboardAndMouse;
         
-        InputEvent existingEvent = newOwnerActionGroup.Actions
+        // Get events in this group
+        Array<InputEvent> eventsInPrimaryAction = new Array<InputEvent>(
+            InputMap.ActionGetEvents(groupToUpdate.PrimaryAction)
+                .Where(@event => @event is InputEventKey or InputEventMouseButton)
+        );
+        
+        while(eventsInPrimaryAction.Count < 2)
+        {
+            eventsInPrimaryAction.Add(null);
+        }
+        
+        // Grab primary or secondary event, based on which one we clicked on
+        InputEvent existingEvent = isPrimaryInput ? eventsInPrimaryAction[0] : eventsInPrimaryAction[1];
+        
+        // If event is the same, early exit
+        if(InputMatchesEvent(newEvent, existingEvent)) return InputSwapResponse.NoChange;
+       
+        // If the swapped event is in our current group, remove both and add them back in the right order
+        InputEvent otherEvent = isPrimaryInput ? eventsInPrimaryAction[1] : eventsInPrimaryAction[0];
+        if(InputMatchesEvent(newEvent, otherEvent)) {        
+            RemoveInputMapInputEvent(groupToUpdate.GroupName, newEvent, inputType);
+            RemoveInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType);
+            AddInputMapInputEvent(groupToUpdate.GroupName, newEvent, inputType, isPrimaryInput);
+            AddInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType, !isPrimaryInput);
+            return InputSwapResponse.Success;
+        }
+        
+        // Find group with existing event
+        InputActionGroup owningGroup = InputActionGroups.GetGroups(inputType).Where(group => group != groupToUpdate).FirstOrDefault(group =>
+            group.Actions
+                .SelectMany(action => InputMap.ActionGetEvents(action))
+                .Any(iEvent => InputMatchesEvent(newEvent, iEvent))
+        );
+        
+        if(owningGroup == null)
+        {
+            // Replace the event in our current group with the new action
+            RemoveInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType);
+            AddInputMapInputEvent(groupToUpdate.GroupName, newEvent, inputType, isPrimaryInput);
+            return InputSwapResponse.Success;
+        };
+        
+        // Grab the primary actions
+        Array<InputEvent> eventsInOwningPrimaryAction = new Array<InputEvent>(
+            InputMap.ActionGetEvents(owningGroup.PrimaryAction)
+                .Where(@event => @event is InputEventKey or InputEventMouseButton)
+            );
+        
+        bool isSwappedEventPrimaryInput = InputMatchesEvent(eventsInOwningPrimaryAction.FirstOrDefault(), newEvent);
+        bool owningGroupHasMultipleEvents = eventsInOwningPrimaryAction.Count > 1;
+        
+        // If our source event is empty, and we're swapping with the only event for an action, no-op
+        if(isSwappedEventPrimaryInput && !owningGroupHasMultipleEvents && existingEvent == null) return InputSwapResponse.NoReplacement;
+        
+        // Otherwise replace the events
+        RemoveInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType);
+        AddInputMapInputEvent(groupToUpdate.GroupName, newEvent, inputType, isPrimaryInput);
+        
+        RemoveInputMapInputEvent(owningGroup.GroupName, newEvent, inputType);
+        AddInputMapInputEvent(owningGroup.GroupName, existingEvent, inputType, isSwappedEventPrimaryInput);
+        
+        return InputSwapResponse.Success;
+    }
+    
+    public InputSwapResponse SwapControllerEvents(InputActionGroup groupToUpdate, InputEvent targetEvent)
+    {
+        GenericInputType inputType = GenericInputType.Controller;
+        
+        InputEvent existingEvent = groupToUpdate.Actions
             .SelectMany(action => InputMap.ActionGetEvents(action))
-            .FirstOrDefault(it => inputType switch
-            {
-                GenericInputType.Controller => it is InputEventJoypadButton or InputEventJoypadMotion,
-                GenericInputType.Keyboard => it is InputEventKey,
-                GenericInputType.Mouse => it is InputEventMouseButton,
-                _ => false,
-            });
+            .FirstOrDefault(it => it is InputEventJoypadButton or InputEventJoypadMotion);
         
-        if(InputMatchesEvent(targetEvent, existingEvent)) return;
+        if(InputMatchesEvent(targetEvent, existingEvent)) return InputSwapResponse.NoChange;
         
         if(targetEvent is InputEventJoypadMotion joypadMotion)
         {
@@ -88,27 +154,47 @@ public partial class InputManager : Node
             if(joypadMotion.AxisValue > 0) joypadMotion.AxisValue = 1.0f;
         }
         
-        InputActionGroup owningGroup = InputActionGroups.ActionGroups.FirstOrDefault(group =>
+        InputActionGroup owningGroup = InputActionGroups.GetGroups(inputType).FirstOrDefault(group =>
             group.Actions
                 .SelectMany(action => InputMap.ActionGetEvents(action))
                 .Any(iEvent => InputMatchesEvent(targetEvent, iEvent))
         );
         
-        RemoveInputMapInputEvent(newOwnerActionGroup.GroupName, existingEvent);
-        AddInputMapInputEvent(newOwnerActionGroup.GroupName, targetEvent);
+        RemoveInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType);
+        AddInputMapInputEvent(groupToUpdate.GroupName, targetEvent, inputType);
         
-        if(owningGroup == null) return;
+        if(owningGroup != null)
+        {
+            RemoveInputMapInputEvent(owningGroup.GroupName, targetEvent, inputType);
+            AddInputMapInputEvent(owningGroup.GroupName, existingEvent, inputType);
+        }
         
-        RemoveInputMapInputEvent(owningGroup.GroupName, targetEvent);
-        AddInputMapInputEvent(owningGroup.GroupName, existingEvent);
+        return InputSwapResponse.Success;
     }
 
-    public void AddInputMapInputEvent(string inputAction, InputEvent inputEvent)
+    public void AddInputMapInputEvent(string inputAction, InputEvent inputEvent, GenericInputType inputType, bool isPrimaryInput = false)
     {
-        var actionGroup = InputActionGroups.GetGroup(inputAction);
+        if(inputEvent == null) return;
+        
+        var actionGroup = InputActionGroups.GetGroup(inputType, inputAction);
         foreach (string action in actionGroup.Actions)
         {
-            InputMap.ActionAddEvent(action, inputEvent);
+            // If the action is the primary one, we want it to be at the front of the action
+            // It doesn't matter if types are interspaced (keyboard, controller, keyboard) 
+            if (isPrimaryInput)
+            {
+                Array<InputEvent> existing = InputMap.ActionGetEvents(action);
+                InputMap.ActionEraseEvents(action);
+                InputMap.ActionAddEvent(action, inputEvent);
+                foreach (InputEvent iEvent in existing)
+                {
+                    InputMap.ActionAddEvent(action, iEvent);
+                }
+            }
+            else
+            {
+                InputMap.ActionAddEvent(action, inputEvent);
+            }
             
             // Treat triggers like buttons
             if(inputEvent is InputEventJoypadMotion { Axis: JoyAxis.TriggerLeft or JoyAxis.TriggerRight })
@@ -120,9 +206,9 @@ public partial class InputManager : Node
         InputActionGroupUpdated?.Invoke(actionGroup);
     }
 
-    public void RemoveInputMapInputEvent(string inputAction, InputEvent inputEvent)
+    public void RemoveInputMapInputEvent(string inputAction, InputEvent inputEvent, GenericInputType inputType)
     {
-        var actionGroup = InputActionGroups.GetGroup(inputAction);
+        var actionGroup = InputActionGroups.GetGroup(inputType, inputAction);
         foreach (string action in actionGroup.Actions)
         {
             InputMap.ActionEraseEvent(action, inputEvent);
@@ -130,9 +216,9 @@ public partial class InputManager : Node
         InputActionGroupUpdated?.Invoke(actionGroup);
     }
 
-    public void RemoveInputMapInputEvents(string groupName)
+    public void RemoveInputMapInputEvents(string groupName, GenericInputType inputType)
     {
-        var actionGroup = InputActionGroups.GetGroup(groupName);
+        var actionGroup = InputActionGroups.GetGroup(inputType, groupName);
         foreach (string action in actionGroup.Actions)
         {
             InputMap.ActionEraseEvents(action);
@@ -239,5 +325,20 @@ public partial class InputManager : Node
             
             _ => false
         };
+    }
+    
+    public static Array<InputEvent> GetEventsForInputType(GenericInputType genericInputType, string action)
+    {
+        var inputActions = InputMap.ActionGetEvents(action);
+        switch(genericInputType)
+        {
+            case GenericInputType.KeyboardAndMouse:
+                return new Array<InputEvent>(inputActions.Where(it => it is InputEventKey or InputEventMouse));
+            
+            case GenericInputType.Controller:
+                return new Array<InputEvent>(inputActions.Where(it => it is InputEventJoypadButton or InputEventJoypadMotion));
+        }
+        
+        return [];
     }
 }

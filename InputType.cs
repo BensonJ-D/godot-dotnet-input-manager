@@ -12,6 +12,5 @@ public enum InputType
 public enum GenericInputType
 {
     Controller,
-    Keyboard,
-    Mouse,
+    KeyboardAndMouse,
 }
