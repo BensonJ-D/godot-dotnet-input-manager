@@ -43,9 +43,8 @@ public partial class AwaitInputModal : PanelContainer
         
         switch(_inputType)
         {
-            case GenericInputType.Keyboard when @event is not InputEventKey:
+            case GenericInputType.KeyboardAndMouse when @event is not InputEventKey and not InputEventMouseButton:
             case GenericInputType.Controller when @event is not InputEventJoypadButton and not InputEventJoypadMotion:
-            case GenericInputType.Mouse when @event is not InputEventMouseButton:
                 return;
         }
         
