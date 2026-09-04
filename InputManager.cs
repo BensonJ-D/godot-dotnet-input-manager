@@ -27,8 +27,15 @@ public partial class InputManager : Node
     public Action<InputType> InputTypeChanged { get; set; }
     public Action<InputEvent> InputPressed { get; set; }
     public Action<InputActionGroup> InputActionGroupUpdated { get; set; }
-
-    public enum InputSwapResponse { Success, NoChange, NoReplacement }
+    
+    public enum SwapStatus { Success, NoChange, NoReplacement }
+    
+    public record InputSwapResponse(InputActionGroup TargetGroup, SwapStatus Status)
+    {
+        public static InputSwapResponse NoChange => new(null, SwapStatus.NoChange);
+        public static InputSwapResponse NoReplacement => new(null, SwapStatus.NoReplacement);
+        public static InputSwapResponse Success(InputActionGroup group) => new (group, SwapStatus.Success);
+    }
     
     public override void _Ready()
     {
@@ -110,7 +117,7 @@ public partial class InputManager : Node
             RemoveInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType);
             AddInputMapInputEvent(groupToUpdate.GroupName, newEvent, inputType, isPrimaryInput);
             AddInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType, !isPrimaryInput);
-            return InputSwapResponse.Success;
+            return InputSwapResponse.Success(null);
         }
         
         // Find group with existing event
@@ -125,7 +132,7 @@ public partial class InputManager : Node
             // Replace the event in our current group with the new action
             RemoveInputMapInputEvent(groupToUpdate.GroupName, existingEvent, inputType);
             AddInputMapInputEvent(groupToUpdate.GroupName, newEvent, inputType, isPrimaryInput);
-            return InputSwapResponse.Success;
+            return InputSwapResponse.Success(null);
         };
         
         // Grab the primary actions
@@ -147,7 +154,7 @@ public partial class InputManager : Node
         RemoveInputMapInputEvent(owningGroup.GroupName, newEvent, inputType);
         AddInputMapInputEvent(owningGroup.GroupName, existingEvent, inputType, isSwappedEventPrimaryInput);
         
-        return InputSwapResponse.Success;
+        return InputSwapResponse.Success(owningGroup);
     }
     
     public InputSwapResponse SwapControllerEvents(InputActionGroup groupToUpdate, InputEvent targetEvent)
@@ -181,7 +188,7 @@ public partial class InputManager : Node
             AddInputMapInputEvent(owningGroup.GroupName, existingEvent, inputType);
         }
         
-        return InputSwapResponse.Success;
+        return InputSwapResponse.Success(owningGroup);
     }
 
     public void AddInputMapInputEvent(string inputAction, InputEvent inputEvent, GenericInputType inputType, bool isPrimaryInput = false)
@@ -220,6 +227,8 @@ public partial class InputManager : Node
 
     public void RemoveInputMapInputEvent(string inputAction, InputEvent inputEvent, GenericInputType inputType)
     {
+        if(inputEvent == null) return;
+        
         var actionGroup = InputActionGroups.GetGroup(inputType, inputAction);
         foreach (string action in actionGroup.Actions)
         {
@@ -236,6 +245,43 @@ public partial class InputManager : Node
             InputMap.ActionEraseEvents(action);
         }
         InputActionGroupUpdated?.Invoke(actionGroup);
+    }
+    
+    public void RemoveDefaultEvents(string groupName, GenericInputType inputType)
+    {
+        var actionGroup = InputActionGroups.GetGroup(inputType, groupName);
+        foreach (string action in actionGroup.Actions)
+        {
+            Array<InputEvent> defaultEvents = GetActionEventsForType(action, inputType);
+            
+            foreach(InputEvent iEvent in defaultEvents)
+            {
+                InputMap.ActionEraseEvent(action, iEvent);
+            }
+        }
+    }
+    
+    public void AddLoadedEvents(string groupName, Array<InputEvent> inputEvents, GenericInputType inputType)
+    {
+        var actionGroup = InputActionGroups.GetGroup(inputType, groupName);
+        foreach (string action in actionGroup.Actions)
+        {
+            foreach(InputEvent iEvent in inputEvents)
+            {
+                InputMap.ActionAddEvent(action, iEvent);
+            }
+        }
+    }
+    
+    public Array<InputEvent> GetActionEventsForType(string action, GenericInputType inputType)
+    {
+        return new Array<InputEvent>(
+            InputMap.ActionGetEvents(action)
+                .Where(it =>
+                    inputType == GenericInputType.KeyboardAndMouse ?
+                        it is InputEventKey or InputEventMouseButton :
+                        it is InputEventJoypadButton or InputEventJoypadMotion)
+        );
     }
 
     public string GetInputIcon(string inputAction)
